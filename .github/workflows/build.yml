@@ -9,6 +9,7 @@ on:
     push:
         branches:
             - main
+    workflow_dispatch:
 
 
 permissions:
@@ -35,7 +36,7 @@ jobs:
                     key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
                     restore-keys: ${{ runner.os }}-m2-
             -   name: Build with Maven
-                run: mvn --no-transfer-progress -DskipTests verify 
+                run: mvn --no-transfer-progress -DskipTests -Dmaven.test.skip=true verify 
 
             -   name: SonarQube Scan
                 uses: sonarsource/sonarqube-scan-action@master
@@ -46,3 +47,26 @@ jobs:
                     args: 
                         -Dsonar.projectKey=${{ secrets.WEBGOAT_SONAR_PROJECT_KEY }}  
                         -Dsonar.java.binaries=./target
+
+
+            -   name: Run SpotBugs
+                run: mvn com.github.spotbugs:spotbugs-maven-plugin:spotbugs
+            
+            -   name: Archive production artifacts
+                uses: actions/upload-artifact@v3
+                with:
+                  name: spotbugs-xml
+                  path: |
+                    target/spotbugsXml.xml
+
+
+            -   name: Run PMD
+                id: pmd
+                uses: pmd/pmd-github-action@v2
+                with:
+                  rulesets: 'rulesets/java/quickstart.xml'
+                  analyzeModifiedFilesOnly: false
+            -   name: Upload SARIF file
+                uses: github/codeql-action/upload-sarif@v3
+                with:
+                  sarif_file: pmd-report.sarif
